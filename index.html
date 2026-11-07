@@ -3817,7 +3817,15 @@ function loadVilM(g){
           }
         });
         sc.updateMatrixWorld(true);
-        var box=new T.Box3().setFromObject(sc),h=box.max.y-box.min.y;
+        var box=new T.Box3(),h,v3=new T.Vector3();
+        /* Höhe aus dem tatsächlich gezeichneten (geskinnten) Zustand messen, nicht aus der Bind-Pose */
+        sc.traverse(function(o){
+          if(o.isSkinnedMesh){
+            o.skeleton.update();var pa=o.geometry.attributes.position,q;
+            for(q=0;q<pa.count;q++){v3.fromBufferAttribute(pa,q);o.boneTransform(q,v3);v3.applyMatrix4(o.matrixWorld);box.expandByPoint(v3);}
+          }else if(o.isMesh){box.expandByObject(o);}
+        });
+        h=box.max.y-box.min.y;
         if(!(h>0))throw new Error('Höhe 0');
         D.s=(D.h||(g==='f'?1.55:1.65))/h;D.minY=box.min.y;
         gltf.animations.forEach(function(a){D.clips[a.name]=a;});
@@ -3906,7 +3914,15 @@ function loadAsche(){
           }
         });
         sc.updateMatrixWorld(true);
-        var box=new T.Box3().setFromObject(sc),h=box.max.y-box.min.y;
+        var box=new T.Box3(),h,v3=new T.Vector3();
+        /* Höhe aus dem tatsächlich gezeichneten (geskinnten) Zustand messen, nicht aus der Bind-Pose */
+        sc.traverse(function(o){
+          if(o.isSkinnedMesh){
+            o.skeleton.update();var pa=o.geometry.attributes.position,q;
+            for(q=0;q<pa.count;q++){v3.fromBufferAttribute(pa,q);o.boneTransform(q,v3);v3.applyMatrix4(o.matrixWorld);box.expandByPoint(v3);}
+          }else if(o.isMesh){box.expandByObject(o);}
+        });
+        h=box.max.y-box.min.y;
         if(!(h>0))throw new Error('Höhe 0');
         AM.h=h;AM.minY=box.min.y;
         gltf.animations.forEach(function(a){AM.clips[a.name]=a;});
@@ -6457,7 +6473,15 @@ function loadTurtle(){
           }
         });
         sc.updateMatrixWorld(true);
-        var box=new T.Box3().setFromObject(sc),h=box.max.y-box.min.y;
+        var box=new T.Box3(),h,v3=new T.Vector3();
+        /* Höhe aus dem tatsächlich gezeichneten (geskinnten) Zustand messen, nicht aus der Bind-Pose */
+        sc.traverse(function(o){
+          if(o.isSkinnedMesh){
+            o.skeleton.update();var pa=o.geometry.attributes.position,q;
+            for(q=0;q<pa.count;q++){v3.fromBufferAttribute(pa,q);o.boneTransform(q,v3);v3.applyMatrix4(o.matrixWorld);box.expandByPoint(v3);}
+          }else if(o.isMesh){box.expandByObject(o);}
+        });
+        h=box.max.y-box.min.y;
         if(!(h>0))throw new Error('Höhe 0');
         TU.h=h;TU.minY=box.min.y;
         /* Bewegung steckt im Modell nicht drin: Hüft-Verschiebung in x/z festhalten (Schwimmen läuft sonst davon und springt zurück) */
@@ -9918,6 +9942,6 @@ placeCamera();updHUD();
 requestAnimationFrame(frame);
 })();
 </script>
-<div id="ver" style="position:fixed;left:6px;bottom:3px;z-index:3;font:11px sans-serif;color:#fff;background:rgba(20,24,32,.78);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:3px 8px;pointer-events:none">Stand 07.11. 10:20 · Schildkröte</div>
+<div id="ver" style="position:fixed;left:6px;bottom:3px;z-index:3;font:11px sans-serif;color:#fff;background:rgba(20,24,32,.78);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:3px 8px;pointer-events:none">Stand 07.11. 10:45 · Schildkröte</div>
 </body>
 </html>
