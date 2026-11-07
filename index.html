@@ -339,6 +339,7 @@ button.on em{background:rgba(58,42,0,.18)}
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
 <script src="models/kuno.js"></script>
+<script src="models/schildkroete.js"></script>
 <script src="models/hand.js"></script>
 <script src="models/house.js"></script>
 <script src="models/asche.js"></script>
@@ -3928,7 +3929,7 @@ function amDress(o,height){
 function amPlay(o,key,lock){
   var A=o.am;if(!A)return;
   if(lock>0)A.lock=lock;
-  var def=AMAP[key]||AMAP.idle,clip=AM.clips[def[0]];
+  var mp=A.map||AMAP,def=mp[key]||mp.idle,clip=(A.clips||AM.clips)[def[0]];
   if(!clip)return;
   var nm=def[0]+'|'+def[1];
   if(A.name===nm)return;
@@ -6434,6 +6435,84 @@ function p5Goal(h){
   }
   return{x:R_ISLE-60,z:h.z};
 }
+/* ---------- Schildkröte (schildkroete.glb): Modell, Animationen, Schwimmen ---------- */
+var TU={tries:0,proto:null,clips:{},h:1.2,minY:0,ready:false};
+var TUMAP={idle:['Stand_and_Chat',1],walk:['walking_2_inplace',1],run:['Running',.8],swim:['Swim_Forward',1],edge:['swimming_to_edge',1.1],cheer:['Cheer_with_Both_Hands',1]};
+function loadTurtle(){
+  if(!window.TURTLE_B64)return;
+  if(!T.GLTFLoader||!T.SkeletonUtils){if(TU.tries++<15)setTimeout(loadTurtle,1000);return;}
+  try{
+    var bin=atob(window.TURTLE_B64),n=bin.length,u8=new Uint8Array(n),i;
+    for(i=0;i<n;i++)u8[i]=bin.charCodeAt(i);
+    new T.GLTFLoader().parse(u8.buffer,'',function(gltf){
+      try{
+        var sc=gltf.scene;
+        sc.traverse(function(o){
+          if(o.isMesh||o.isSkinnedMesh){
+            o.castShadow=true;o.frustumCulled=false;
+            var ms=Array.isArray(o.material)?o.material:[o.material];
+            ms.forEach(function(m){if(m){
+              if(m.map){m.map.encoding=T.LinearEncoding;m.emissiveMap=m.map;m.emissive=new T.Color(.42,.38,.38);}
+              m.metalness=0;m.roughness=1;m.metalnessMap=null;m.roughnessMap=null;m.side=T.DoubleSide;m.needsUpdate=true;}});
+          }
+        });
+        sc.updateMatrixWorld(true);
+        var box=new T.Box3().setFromObject(sc),h=box.max.y-box.min.y;
+        if(!(h>0))throw new Error('Höhe 0');
+        TU.h=h;TU.minY=box.min.y;
+        /* Bewegung steckt im Modell nicht drin: Hüft-Verschiebung in x/z festhalten (Schwimmen läuft sonst davon und springt zurück) */
+        gltf.animations.forEach(function(a){
+          a.tracks.forEach(function(t){
+            if(/Hips\.position$/.test(t.name)){var v=t.values,k;for(k=3;k<v.length;k+=3){v[k]=v[0];v[k+2]=v[2];}}
+          });
+          TU.clips[a.name]=a;
+        });
+        TU.proto=sc;TU.ready=true;window.TURTLE_B64=null;
+      }catch(e){TU.proto=null;if(window.console)console.warn('Schildkröten-Modell:',e);}
+    },function(e){if(window.console)console.warn('Schildkröten-Modell nicht lesbar',e);});
+  }catch(e){if(window.console)console.warn(e);}
+}
+setTimeout(loadTurtle,0);
+function tuDress(o,height){
+  if(o.am||!TU.ready||!o.g)return;
+  while(o.g.children.length)o.g.remove(o.g.children[0]);
+  o.g.scale.setScalar(1);
+  var cl=T.SkeletonUtils.clone(TU.proto),w=new T.Group();
+  cl.position.y=-TU.minY;w.add(cl);w.scale.setScalar(height/TU.h);o.g.add(w);
+  o.am={mx:new T.AnimationMixer(cl),cur:null,name:'',lock:0,acc:0,map:TUMAP,clips:TU.clips};
+  o.bh=height+.9;o.camY=height*.55;o.legs=null;o.head=null;
+  amPlay(o,'idle',0);o.am.mx.update(rnd(0,2));
+}
+/* Mauer im Weg? Dann nicht außenherum über die Brücke, sondern durch die Bucht schwimmen */
+function tuWallAt(x,z){return LAND2&&Math.abs(x-BAY.x)<9&&z<BAY.z0-26&&z>-R_ISLE-95;}
+function tuViaPoint(){
+  var z,x=BAY.x;
+  for(z=BAY.z0+14;z<BAY.z0+120;z+=6)if(hAt(x,z)<-.3)return{x:x,z:z};
+  return{x:x,z:BAY.z0+30};
+}
+/* Läuft über Land, schwimmt durch Wasser; liefert true wenn gerade geschwommen wird */
+function tuMove(o,gx,gz,sp,dt){
+  var tx=gx,tz=gz;
+  if(!o.via&&LAND2&&(o.x-BAY.x)*(gx-BAY.x)<0){
+    var zc=o.z+(gz-o.z)*(BAY.x-o.x)/(gx-o.x);
+    if(zc<BAY.z0-26)o.via=tuViaPoint();
+  }
+  if(o.via){
+    tx=o.via.x;tz=o.via.z;
+    if(Math.hypot(o.x-tx,o.z-tz)<5){o.via=null;tx=gx;tz=gz;}
+  }
+  var dx=tx-o.x,dz=tz-o.z,d=Math.hypot(dx,dz);
+  if(d<.001)return !!o.swim;
+  var wet=hAt(o.x,o.z)<.4,st=Math.min(sp*(wet?.7:1)*dt,d),nx=o.x+dx/d*st,nz=o.z+dz/d*st;
+  if(!wet){var pp=avoidObst(o,nx,nz,tx,tz,st);nx=pp.x;nz=pp.z;}
+  if(tuWallAt(nx,nz)&&!tuWallAt(o.x,o.z)){nx=o.x;nz=o.z;}
+  o.x=nx;o.z=nz;
+  var dy=Math.atan2(dx,dz)-o.yaw;
+  while(dy>Math.PI)dy-=TAU;while(dy<-Math.PI)dy+=TAU;
+  o.yaw+=dy*Math.min(1,dt*8);
+  o.swim=hAt(nx,nz)<.4;
+  return o.swim;
+}
 function mkTurtle(x,z){
   var g=new T.Group(),lam=function(c){return new T.MeshLambertMaterial({color:c});};
   var shell=new T.Mesh(new T.SphereGeometry(1.5,16,10,0,TAU,0,Math.PI/2),lam(0x5b7d3a));shell.scale.set(1,.75,1.25);shell.position.y=.55;shell.castShadow=true;g.add(shell);
@@ -6518,7 +6597,7 @@ function p5Decline(){
 function p5Accept(){
   var o=P5.o;if(!o)return;
   P5.goal=p5Goal(P5.home);P5.nest=mkNest(P5.goal.x,P5.goal.z);
-  o.yaw=Math.atan2(P5.goal.x-o.x,P5.goal.z-o.z);
+  o.yaw=Math.atan2(P5.goal.x-o.x,P5.goal.z-o.z);o.via=null;o.swim=false;o.cheer=false;
   P5.st='count';P5.cd=5;P5.num=-1;P5.stuck=0;SC.hudKey='';
   bubble(o,'Dann mal los!',2,'bad');
 }
@@ -6527,7 +6606,7 @@ function p5End(win){
   P5.st='react';SC.hudKey='';
   var o=P5.o,g=P5.goal;
   if(win){o.x=g.x-9;o.z=g.z+3;o.yaw=Math.atan2(g.x-o.x,g.z-o.z);}
-  o.walking=false;
+  o.walking=false;o.cheer=!win;o.via=null;o.swim=false;
   later(function(){
     if(!P5.o)return;
     jumpTo(o.x,o.z,false);
@@ -6569,17 +6648,25 @@ function p5Tick(dt){
   if(P5.goT>0){P5.goT-=dt;if(P5.goT<=0)p5CdHide();}
   if(P5.st==='race'&&!SN.on&&!SM.open&&P5.goal){
     var gx=P5.goal.x,gz=P5.goal.z,sp=Math.max(2.6,(3.6+c.scale*.55)*(1-(c.fat||0)*.25)*.8),x0=o.x,z0=o.z;
-    walk(o,gx,gz,sp,dt);
+    if(o.am)tuMove(o,gx,gz,sp*.8,dt);else walk(o,gx,gz,sp,dt);   /* kürzerer Weg durch die Bucht: dafür etwas langsamer als vorher */
     P5.stuck=Math.hypot(o.x-x0,o.z-z0)<sp*dt*.3?P5.stuck+dt:0;
     if(P5.stuck>2){var dx=gx-o.x,dz=gz-o.z,dd=Math.hypot(dx,dz)||1;o.x+=dx/dd*sp*dt;o.z+=dz/dd*sp*dt;o.yaw=Math.atan2(dx,dz);}
     moving=true;o.walking=true;
     if(!crLocked()&&Math.hypot(c.x-gx,c.z-gz)<10)p5End(true);
     else if(Math.hypot(o.x-gx,o.z-gz)<5)p5End(false);
   }
+  if(!o.am&&TU.ready)tuDress(o,6.6);
   o.y=Math.max(hAt(o.x,o.z),0);o.g.position.set(o.x,o.y,o.z);o.g.rotation.y=o.yaw;
-  var sw=moving?Math.sin(o.ph*6)*.5:0;
-  o.legs[0].rotation.x=sw;o.legs[3].rotation.x=sw;o.legs[1].rotation.x=-sw;o.legs[2].rotation.x=-sw;
-  o.head.position.z=1.95+Math.sin(o.ph*(moving?6:1.2))*(moving?.07:.05);
+  if(o.am){
+    var wantA=moving?(o.swim?'swim':'run'):(o.cheer?'cheer':'idle');
+    if(o.wasSwim&&!o.swim&&moving)amPlay(o,'edge',1.3);
+    o.wasSwim=!!o.swim;
+    amStep(o,dt,wantA);
+  }else if(o.legs){
+    var sw=moving?Math.sin(o.ph*6)*.5:0;
+    o.legs[0].rotation.x=sw;o.legs[3].rotation.x=sw;o.legs[1].rotation.x=-sw;o.legs[2].rotation.x=-sw;
+    o.head.position.z=1.95+Math.sin(o.ph*(moving?6:1.2))*(moving?.07:.05);
+  }
   if(P5.anchor){P5.anchor.x=o.x;P5.anchor.z=o.z;P5.anchor.y=o.y+1.4;}
 }
 function p5HudKey(){
