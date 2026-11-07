@@ -7156,9 +7156,10 @@ var SH_TXT={"talk": [["evil", "Und nun, Boss? Der Graue ist erledigt, die Insel 
 function shSpot(){
   if(!GR.S)return null;
   var angs=[Math.PI/4,Math.PI/2,0,Math.PI*.75,-Math.PI/4,Math.PI],i,r,a,x,z,lx,lz;
+  for(i=0;i<24;i++)angs.push(i/24*TAU+.13);   /* Reserve: weitere Richtungen */
   for(i=0;i<angs.length;i++){
     a=angs[i];
-    for(r=30,lx=null;r<=420;r+=5){
+    for(r=30,lx=null;r<=600;r+=5){
       x=GR.S.x+Math.cos(a)*r;z=GR.S.z+Math.sin(a)*r;
       if(!isLand(x,z)||hAt(x,z)<.5){
         if(lx){var d=Math.hypot(lx.x,lx.z)||1;return{x:lx.x,z:lx.z,dx:lx.x/d,dz:lx.z/d};}
@@ -7202,8 +7203,11 @@ function shLook(){
   SH.deb.forEach(function(d,i){d.visible=i/SH.deb.length>=p;});
 }
 function shBuild(){
-  if(SH.built||!GR.built)return false;
+  if(SH.built&&SH.g&&SH.cap&&SH.cap.alive!==false)return true;   /* schon aufgebaut */
+  if(SH.built){SH.built=false;if(SH.cap){SH.cap.alive=false;if(SH.cap.g)scene.remove(SH.cap.g);var ci=vils.indexOf(SH.cap);if(ci>=0)vils.splice(ci,1);SH.cap=null;}}
+  if(!GR.built)return false;
   var sp=shSpot();if(!sp)return false;
+  if(SH.g){scene.remove(SH.g);SH.g=null;}
   SH.spot=sp;shMk(sp);shLook();
   /* Der Kapitän steht an Land neben dem Wrack */
   var cx=sp.x-sp.dx*7-sp.dz*6,cz=sp.z-sp.dz*7+sp.dx*6;
@@ -7218,7 +7222,7 @@ function shClear(){
   if(SH.scroll){scrollRemove(SH.scroll);SH.scroll=null;}
   if(SH.g){scene.remove(SH.g);SH.g=null;}
   if(SH.cap){SH.cap.alive=false;if(SH.cap.g)scene.remove(SH.cap.g);var i=vils.indexOf(SH.cap);if(i>=0)vils.splice(i,1);SH.cap=null;}
-  SH.stage='none';SH.wood=0;SH.built=false;SH.pend=null;SH.spot=null;SH.anchor=null;SH.sailT=0;
+  SH.stage='none';SH.talked=false;SH.wood=0;SH.built=false;SH.pend=null;SH.spot=null;SH.anchor=null;SH.sailT=0;
   var e=document.getElementById('ending');if(e)e.remove();
 }
 function shSnap(){return{stage:SH.stage==='none'?'none':(SH.stage==='wood'?'wood':(SH.stage==='offer'||SH.stage==='scene'||SH.stage==='talk'?'offer':'none')),wood:SH.wood};}
@@ -7287,10 +7291,15 @@ function shTick(dt){
   }
   if(SH.restore){SH.restore=false;if(!shBuild()){SH.restore=true;return;}shLook();if(SH.stage==='offer')SH.scroll=scrollAdd('ship','gold',QD.ship.title,SH.anchor,shScene);}
   /* Auslöser: der Graue ist besiegt */
-  if(SH.stage==='none'&&SC.done.grey==='done'&&!SC.done.ship&&!SN.on&&!SM.open&&!mqBusy()&&!DL.busy&&!BM.on){SH.stage='talk';SH.pend=SH_TXT.talk;SH.pt=2;}
+  if(SH.stage==='none'&&SC.done.grey==='done'&&!SC.done.ship&&!SN.on&&!SM.open&&!mqBusy()&&!DL.busy&&!BM.on){
+    if(SH.talked){   /* Dialog lief schon: nur noch das Wrack aufbauen, ohne ihn zu wiederholen */
+      SH.rt=(SH.rt||0)-dt;
+      if(SH.rt<=0){SH.rt=3;if(shBuild()){SH.stage='offer';if(!SH.scroll)SH.scroll=scrollAdd('ship','gold',QD.ship.title,SH.anchor,shScene);SC.hudKey='';}}
+    }else{SH.stage='talk';SH.pend=SH_TXT.talk;SH.pt=2;}
+  }
   if(SH.stage==='talk'){
     SH.pt-=dt;
-    if(SH.pt<=0){SH.pt=.6;if(dialogStart(SH.pend,1.2)){SH.pend=null;
+    if(SH.pt<=0){SH.pt=.6;if(dialogStart(SH.pend,1.2)){SH.pend=null;SH.talked=true;
       if(shBuild()){SH.stage='offer';SH.scroll=scrollAdd('ship','gold',QD.ship.title,SH.anchor,shScene);jumpTo(SH.g.position.x-10,SH.g.position.z,false);SC.hudKey='';}
       else SH.stage='none';}}
   }
@@ -9928,6 +9937,6 @@ placeCamera();updHUD();
 requestAnimationFrame(frame);
 })();
 </script>
-<div id="ver" style="position:fixed;left:6px;bottom:3px;z-index:3;font:11px sans-serif;color:#fff;background:rgba(20,24,32,.78);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:3px 8px;pointer-events:none">Stand 07.11. 11:20 · Kapitän</div>
+<div id="ver" style="position:fixed;left:6px;bottom:3px;z-index:3;font:11px sans-serif;color:#fff;background:rgba(20,24,32,.78);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:3px 8px;pointer-events:none">Stand 07.11. 11:35 · Schiffsquest</div>
 </body>
 </html>
