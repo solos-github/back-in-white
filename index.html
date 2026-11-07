@@ -480,6 +480,8 @@ function bridgeMask(x,z){
 /* Um die Brücke wachsen keine Bäume (Land 2): 50 Einheiten Abstand zur Brückenstrecke */
 var TREE_FREE=50;
 function treeBanned(x,z){
+  /* Tempel des Grauen (alle Länder): ebenfalls kein Baum im Umkreis */
+  if(typeof GR!=='undefined'&&GR&&GR.S&&Math.hypot(x-GR.S.x,z-GR.S.z)<TREE_FREE)return true;
   if(!LAND2)return false;
   var cx=clamp(x,BAY.x-BAY.r-30,BAY.x+BAY.r+30);
   if(Math.hypot(x-cx,z-BAY.bz)<TREE_FREE)return true;
@@ -9942,6 +9944,6 @@ placeCamera();updHUD();
 requestAnimationFrame(frame);
 })();
 </script>
-<div id="ver" style="position:fixed;left:6px;bottom:3px;z-index:3;font:11px sans-serif;color:#fff;background:rgba(20,24,32,.78);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:3px 8px;pointer-events:none">Stand 07.11. 10:45 · Schildkröte</div>
+<div id="ver" style="position:fixed;left:6px;bottom:3px;z-index:3;font:11px sans-serif;color:#fff;background:rgba(20,24,32,.78);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:3px 8px;pointer-events:none">Stand 07.11. 11:05 · Bäume am Tempel</div>
 </body>
 </html>
